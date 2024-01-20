@@ -1,10 +1,12 @@
-use std::{ops::Add};
 
-use chrono::{DateTime, Local, Duration};
+use std::{ops::Add, collections::HashMap};
+
+use chrono::{DateTime, Local, Duration, NaiveDateTime};
 use loki_api::{logproto::{StreamAdapter, EntryAdapter, PushRequest}, prost_types::Timestamp, prost};
 /// The json types used in rest requests
 pub mod types;
 
+use serde_json::{Value, Map};
 use types::*;
 
 ///
@@ -47,6 +49,58 @@ impl Buffer {
     }
 }
 
+#[derive(Debug)]
+pub struct LokiResult {
+    pub labels: HashMap<String, String>,
+    pub values: Vec<LokiValue>
+}
+
+impl LokiResult {
+    fn from_json(mut labels: Map<String, Value>, values: Vec<LokiValue>) -> LokiResult {
+        let mut labels_new: HashMap<_, _> = HashMap::new();
+        let keys = labels.keys().cloned().collect::<Vec<_>>();
+        for key in keys {
+            let (k, v) = labels.remove_entry (&key).unwrap();
+            labels_new.insert(k, v.as_str().unwrap().to_owned());
+        }
+        LokiResult {
+            labels: labels_new,
+            values
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct LokiValue {
+    pub timestamp: DateTime<Local>,
+    pub log_line: String
+}
+
+impl LokiValue {
+    fn from_nano(timestamp: String, log_line: String) -> Option<LokiValue> {
+        let timestamp = timestamp.parse::<i64>().expect("Unable to parse timestamp");
+        let secs = timestamp / 1_000_000_000;
+        let ns = timestamp - (secs * 1_000_000_000);
+    
+        let dt = NaiveDateTime::from_timestamp_opt(secs, ns as u32);
+        //let timestamp = Local.from_local_datetime(&dt.expect("Unable to parse timestamp")).unwrap();
+        let timestamp = DateTime::<Local>::from_naive_utc_and_offset(dt.unwrap(), *Local::now().offset());
+        Some(LokiValue {
+            timestamp,
+            log_line
+        })
+    }
+
+    fn from_sec(timestamp: i64, log_line: String) -> Option<LokiValue> {
+        let dt = NaiveDateTime::from_timestamp_opt(timestamp, 0);
+        let timestamp = DateTime::<Local>::from_naive_utc_and_offset(dt.unwrap(), *Local::now().offset());
+        Some(LokiValue {
+            timestamp,
+            log_line
+        })
+    }
+}
+
 ///
 /// A very basic Loki client
 pub struct Loki {
@@ -64,6 +118,77 @@ impl Loki {
             client,
             buffer: Buffer::new()
         }
+    }
+
+    pub async fn query_range(&mut self, query: &str, limit: Option<i64>, start: Option<DateTime<Local>>, end: Option<DateTime<Local>>) -> Option<Vec<LokiResult>> {
+        let start = start.unwrap_or(Local::now().add(Duration::hours(-6)));
+        let end = end.unwrap_or(Local::now());
+        let limit = limit.unwrap_or(100);
+
+        let response = self.client.get(format!("{}/loki/api/v1/query_range", self.address))
+            .query(&[("start", start.timestamp()), ("end", end.timestamp()), ("limit", limit)])
+            .query(&[("query", query)])
+            .send()
+            .await;
+
+        if let Err(e) = response {
+            println!("Error receiving label values: {}", e);
+            return None;
+        }
+
+        let response = response.unwrap();
+        if response.status() != 200 {
+            println!("Error sending data to Loki: {}", response.status());
+            println!("Response: {:?}", response.text().await);
+            return None;
+        }
+        let text = &response.text().await.unwrap();
+        let text: Value = serde_json::from_str(text).unwrap();
+
+        // There are two different types of results in loki
+        // matrix and streams. We can read /data/resultType to find out
+        let result_type = text.pointer("/data/resultType").unwrap();
+        let mut results = Vec::new();
+        if result_type == "streams" {
+            let streams = text.pointer("/data/result").unwrap().as_array().unwrap();
+            for stream in streams {
+                let labels: Map<String, Value> = stream["stream"].as_object().unwrap().clone();
+
+                let values = stream["values"].as_array().unwrap();
+                let mut values_vec = Vec::new();
+                for value in values {
+                    let timestamp = value[0].as_str().unwrap().to_owned();
+                    let log_line = value[1].as_str().unwrap().to_owned();
+                    let result = LokiValue::from_nano(timestamp, log_line);
+                    if let Some(result) = result {
+                        values_vec.push(result);
+                    }
+                }
+
+                results.push(LokiResult::from_json(labels, values_vec));
+            }
+        } else if result_type == "matrix" {
+            let streams = text.pointer("/data/result").unwrap().as_array().unwrap();
+            for stream in streams {
+                let labels: Map<String, Value> = stream["metric"].as_object().unwrap().clone();
+
+                let values = stream["values"].as_array().unwrap();
+                let mut values_vec = Vec::new();
+                for value in values {
+                    let timestamp = value[0].as_i64().unwrap().to_owned();
+                    let log_line = value[1].as_str().unwrap().to_owned();
+                    let result = LokiValue::from_sec(timestamp, log_line);
+                    if let Some(result) = result {
+                        values_vec.push(result);
+                    }
+                }
+
+                results.push(LokiResult::from_json(labels, values_vec));
+            }
+        } else {
+            println!("Unknown result type: {}", result_type);
+        }
+        Some(results)
     }
 
     /// Retrieve the values for a given label from Loki
