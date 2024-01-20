@@ -1,0 +1,11 @@
+services:
+  loki:
+    image: grafana/loki:latest
+    ports:
+      - "3100:3100"
+  grafana:
+    image: "grafana/grafana:latest"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./loki.yaml:/etc/grafana/provisioning/datasources/loki.yaml
