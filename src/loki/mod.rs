@@ -1,7 +1,11 @@
+use std::{ops::Add};
 
-use std::time::SystemTime;
-
+use chrono::{DateTime, Local, Duration};
 use loki_api::{logproto::{StreamAdapter, EntryAdapter, PushRequest}, prost_types::Timestamp, prost};
+/// The json types used in rest requests
+pub mod types;
+
+use types::*;
 
 ///
 /// A buffer that can be used to encode and compress protobuf messages.
@@ -62,15 +66,81 @@ impl Loki {
         }
     }
 
+    /// Retrieve the values for a given label from Loki
+    pub async fn label_values(&mut self, label: &str, start: Option<DateTime<Local>>, end: Option<DateTime<Local>>, query: Option<&str>) -> Option<Vec<String>> {
+        let start = start.unwrap_or(Local::now().add(Duration::hours(-6)));
+        let end = end.unwrap_or(Local::now());
+
+        let response = self.client.get(format!("{}/loki/api/v1/label/{}/values", self.address, label))
+            .query(&[("start", start.timestamp()), ("end", end.timestamp())])
+            .query(&[("query", query)])
+            .send()
+            .await;
+
+        if let Err(e) = response {
+            println!("Error receiving label values: {}", e);
+            return None;
+        }
+
+        let response = response.unwrap();
+        if response.status() != 200 {
+            println!("Error sending data to Loki: {}", response.status());
+            println!("Response: {:?}", response.text().await);
+            return None;
+        }
+
+        let text = response.json::<LokiLabels>().await;
+        if let Err(e) = text {
+            println!("Error parsing labels: {}", e);
+            return None;
+        }
+
+        let labels_response = text.unwrap();
+        Some(labels_response.data)
+    }
+
+    /// Retrieve the labels from Loki
+    pub async fn labels(&mut self, start: Option<DateTime<Local>>, end: Option<DateTime<Local>>) -> Option<Vec<String>> {
+        let start = start.unwrap_or(Local::now().add(Duration::hours(-6)));
+        let end = end.unwrap_or(Local::now());
+        
+        let response = self.client.get(format!("{}/loki/api/v1/labels", self.address))
+            .query(&[("start", start.timestamp()), ("end", end.timestamp())])
+            .send()
+            .await;
+
+        if let Err(e) = response {
+            println!("Error receiving labels: {}", e);
+            return None;
+        }
+
+        let response = response.unwrap();
+        if response.status() != 200 {
+            println!("Error sending data to Loki: {}", response.status());
+            println!("Response: {:?}", response.text().await);
+            return None;
+        }
+
+        let text = response.json::<LokiLabels>().await;
+        if let Err(e) = text {
+            println!("Error parsing labels: {}", e);
+            return None;
+        }
+
+        let labels_response = text.unwrap();
+        Some(labels_response.data)
+    }
+
     /// Send a message with labels to Loki
     /// The labels should be in format: {job="test"}
-    pub async fn send_message(&mut self, line: String, labels: String) {
+    pub async fn send_message(&mut self, line: String, labels: String, time: Option<DateTime<Local>>) {
+        let time = time.unwrap_or(Local::now());
         let stream_adapter = StreamAdapter {
             labels,
             entries: vec![
                 EntryAdapter {
                     timestamp: Some(Timestamp {
-                        seconds: SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as i64,
+                        seconds: time.timestamp(),
                         nanos: 0
                     }),
                     line,
