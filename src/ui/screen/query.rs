@@ -1,10 +1,13 @@
 use std::sync::{Arc, Mutex};
 
 use crossterm::event::KeyEvent;
-use log::info;
-use ratatui::{layout::{Layout, Rect}, style::{Style}, text::Text, widgets::Paragraph, Frame};
+use log::{error, info};
+use ratatui::{layout::{Layout, Rect}, style::Style, text::Text, widgets::Paragraph, Frame};
+
 #[cfg(feature = "debug")]
 use tui_logger::{TuiLoggerSmartWidget, TuiLoggerLevelOutput};
+#[cfg(feature = "debug")]
+use ratatui::style::Color;
 use tui_textarea::TextArea;
 
 use crate::{loki::Loki, ui::{App, Store}};
@@ -67,18 +70,9 @@ impl Query<'_> {
         .border_style(Style::default().fg(color));
 
         let store = app.store.lock().unwrap();
-        let results: Vec<String> = store.results.iter().map(|result| {
-            let mut string = String::new();
-            string.push_str(&format!("Labels: {:?}\n", result.labels));
-            string.push_str("Values:\n");
-            for value in &result.values {
-                string.push_str(&format!("  {:?}\n", value));
-            }
-            string
-        }).collect();
 
         frame.render_widget(
-                Paragraph::new(Text::from(results.join("\n")))
+                Paragraph::new(Text::from(store.results.join("\n")))
                     .block(block),
                 rect,
         );
@@ -145,7 +139,21 @@ impl Screen for Query<'_> {
                             let result = loki.query_range(&text, None, None, None).await;
                             info!("{:?}", result);
                             let mut store = store.lock().unwrap();
-                            store.results = result.unwrap();
+                            if let Ok(result) = result {
+                                let results_text: Vec<String> = result.iter().map(|result| {
+                                    let mut string = String::new();
+                                    string.push_str(&format!("Labels: {:?}\n", result.labels));
+                                    string.push_str("Values:\n");
+                                    for value in &result.values {
+                                        string.push_str(&format!("  {:?}\n", value));
+                                    }
+                                    string
+                                }).collect();
+                                store.results = results_text;
+                            } else {
+                                let error = result.unwrap_err();
+                                store.results = vec!["No results".to_string(), error.to_string()];
+                            }
                         });
                         return true;
                     }

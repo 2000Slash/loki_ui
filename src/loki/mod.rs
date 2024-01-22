@@ -2,12 +2,16 @@
 use std::{collections::HashMap, ops::Add};
 
 use chrono::{DateTime, Local, Duration, NaiveDateTime};
+use log::error;
 use loki_api::{logproto::{StreamAdapter, EntryAdapter, PushRequest}, prost_types::Timestamp, prost};
 /// The json types used in rest requests
 pub mod types;
+mod error;
 
 use serde_json::{Value, Map};
 use types::LokiLabels;
+
+use self::error::Error;
 
 ///
 /// A buffer that can be used to encode and compress protobuf messages.
@@ -122,7 +126,7 @@ impl Loki {
         }
     }
 
-    pub async fn query_range(&mut self, query: &str, limit: Option<i64>, start: Option<DateTime<Local>>, end: Option<DateTime<Local>>) -> Option<Vec<LokiResult>> {
+    pub async fn query_range(&mut self, query: &str, limit: Option<i64>, start: Option<DateTime<Local>>, end: Option<DateTime<Local>>) -> Result<Vec<LokiResult>, Error> {
         let start = start.unwrap_or(Local::now().add(Duration::hours(-6)));
         let end = end.unwrap_or(Local::now());
         let limit = limit.unwrap_or(100);
@@ -134,15 +138,12 @@ impl Loki {
             .await;
 
         if let Err(e) = response {
-            println!("Error receiving label values: {e}");
-            return None;
+            return Err(Error::with_source(Box::new(e), String::from("Error receiving data from Loki")));
         }
 
         let response = response.unwrap();
         if response.status() != 200 {
-            println!("Error sending data to Loki: {}", response.status());
-            println!("Response: {:?}", response.text().await);
-            return None;
+            return Err(Error::new(format!("Error sending data to Loki: {:?}", response.text().await)));
         }
         let text = &response.text().await.unwrap();
         let text: Value = serde_json::from_str(text).unwrap();
@@ -188,9 +189,9 @@ impl Loki {
                 results.push(LokiResult::from_json(labels, values_vec));
             }
         } else {
-            println!("Unknown result type: {result_type}");
+            error!("Unknown result type: {result_type}");
         }
-        Some(results)
+        Ok(results)
     }
 
     /// Retrieve the values for a given label from Loki
@@ -205,20 +206,20 @@ impl Loki {
             .await;
 
         if let Err(e) = response {
-            println!("Error receiving label values: {e}");
+            error!("Error receiving label values: {e}");
             return None;
         }
 
         let response = response.unwrap();
         if response.status() != 200 {
-            println!("Error sending data to Loki: {}", response.status());
-            println!("Response: {:?}", response.text().await);
+            error!("Error sending data to Loki: {}", response.status());
+            error!("Response: {:?}", response.text().await);
             return None;
         }
 
         let text = response.json::<LokiLabels>().await;
         if let Err(e) = text {
-            println!("Error parsing labels: {e}");
+            error!("Error parsing labels: {e}");
             return None;
         }
 
@@ -237,20 +238,20 @@ impl Loki {
             .await;
 
         if let Err(e) = response {
-            println!("Error receiving labels: {e}");
+            error!("Error receiving labels: {e}");
             return None;
         }
 
         let response = response.unwrap();
         if response.status() != 200 {
-            println!("Error sending data to Loki: {}", response.status());
-            println!("Response: {:?}", response.text().await);
+            error!("Error sending data to Loki: {}", response.status());
+            error!("Response: {:?}", response.text().await);
             return None;
         }
 
         let text = response.json::<LokiLabels>().await;
         if let Err(e) = text {
-            println!("Error parsing labels: {e}");
+            error!("Error parsing labels: {e}");
             return None;
         }
 
@@ -287,12 +288,12 @@ impl Loki {
             .await;
 
         if let Err(e) = response {
-            println!("Error sending data to Loki: {e}");
+            error!("Error sending data to Loki: {e}");
         } else {
             let response = response.unwrap();
             if response.status() != 204 {
-                println!("Error sending data to Loki: {}", response.status());
-                println!("Response: {:?}", response.text().await);
+                error!("Error sending data to Loki: {}", response.status());
+                error!("Response: {:?}", response.text().await);
             }
         }
     }

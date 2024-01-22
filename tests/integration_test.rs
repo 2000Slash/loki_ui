@@ -11,11 +11,11 @@ async fn main() {
     //let results = loki.query_range("{job=\"a\"}", None, None, None).await.unwrap();
     
     for (counter, result) in results.into_iter().enumerate() {
-        println!("Result: {counter}");
-        println!("Labels: {:?}", result.labels);
-        println!("Values:");
+        error!("Result: {counter}");
+        error!("Labels: {:?}", result.labels);
+        error!("Values:");
         for value in result.values {
-            println!("  {value:?}");
+            error!("  {value:?}");
         }
     }
 }

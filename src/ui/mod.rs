@@ -3,12 +3,20 @@ use std::{io, sync::{Arc, Mutex}};
 use crossterm::event::{self, Event, KeyCode};
 use ratatui::Frame;
 
-use crate::loki::Loki;
+use crate::{loki::Loki, LokiConfig};
 pub mod screen;
 
-#[derive(Default)]
+
 pub struct Store {
-    pub results: Vec<crate::loki::LokiResult>
+    pub results: Vec<String>
+}
+
+impl Default for Store {
+    fn default() -> Self {
+        Self {
+            results: vec![String::from("Type a query above and press enter to see the results"), String::from("You can switch between query and results with ⬆️  and ⬇️."), String::from("Press q or esc to quit")]
+        }
+    }
 }
 
 pub struct App {
@@ -17,21 +25,11 @@ pub struct App {
     store: Arc<Mutex<Store>>
 }
 
-impl Default for App {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-unsafe impl Send for App {
-
-}
-
 impl App {
-    pub fn new() -> Self {
+    pub fn new(config: LokiConfig) -> Self {
         Self {
             screens: vec![Box::new(screen::Query::new())],
-            loki: Loki::new(String::from("http://localhost:3100")),
+            loki: Loki::new(config.url),
             store: Arc::new(Mutex::new(Store::default()))
         }
     }
@@ -62,9 +60,5 @@ impl App {
             }
         }
         Ok(false)
-    }
-
-    pub async fn run_query(&mut self, query: &str) -> Option<Vec<crate::loki::LokiResult>> {
-        self.loki.query_range(query, None, None, None).await
     }
 }

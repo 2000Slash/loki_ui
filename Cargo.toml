@@ -26,6 +26,7 @@ log = "0.4.20"
 
 #general
 color-eyre = { version = "0.6.2", default-features = false }
+confy = "0.6.0"
 
 [features]
 debug = ["dep:tui-logger"]
