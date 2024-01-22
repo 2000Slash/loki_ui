@@ -7,7 +7,7 @@ use loki_api::{logproto::{StreamAdapter, EntryAdapter, PushRequest}, prost_types
 pub mod types;
 
 use serde_json::{Value, Map};
-use types::*;
+use types::LokiLabels;
 
 ///
 /// A buffer that can be used to encode and compress protobuf messages.
@@ -18,8 +18,8 @@ struct Buffer {
 }
 
 impl Buffer {
-    pub fn new() -> Buffer {
-        Buffer {
+    pub fn new() -> Self {
+        Self {
             encoded: Vec::new(),
             snappy: Vec::new(),
         }
@@ -56,14 +56,14 @@ pub struct LokiResult {
 }
 
 impl LokiResult {
-    fn from_json(mut labels: Map<String, Value>, values: Vec<LokiValue>) -> LokiResult {
+    fn from_json(mut labels: Map<String, Value>, values: Vec<LokiValue>) -> Self {
         let mut labels_new: HashMap<_, _> = HashMap::new();
         let keys = labels.keys().cloned().collect::<Vec<_>>();
         for key in keys {
             let (k, v) = labels.remove_entry (&key).unwrap();
             labels_new.insert(k, v.as_str().unwrap().to_owned());
         }
-        LokiResult {
+        Self {
             labels: labels_new,
             values
         }
@@ -77,7 +77,7 @@ pub struct LokiValue {
 }
 
 impl LokiValue {
-    fn from_nano(timestamp: String, log_line: String) -> Option<LokiValue> {
+    fn from_nano(timestamp: String, log_line: String) -> Option<Self> {
         let timestamp = timestamp.parse::<i64>().expect("Unable to parse timestamp");
         let secs = timestamp / 1_000_000_000;
         let ns = timestamp - (secs * 1_000_000_000);
@@ -85,16 +85,16 @@ impl LokiValue {
         let dt = NaiveDateTime::from_timestamp_opt(secs, ns as u32);
         //let timestamp = Local.from_local_datetime(&dt.expect("Unable to parse timestamp")).unwrap();
         let timestamp = DateTime::<Local>::from_naive_utc_and_offset(dt.unwrap(), *Local::now().offset());
-        Some(LokiValue {
+        Some(Self {
             timestamp,
             log_line
         })
     }
 
-    fn from_sec(timestamp: i64, log_line: String) -> Option<LokiValue> {
+    fn from_sec(timestamp: i64, log_line: String) -> Option<Self> {
         let dt = NaiveDateTime::from_timestamp_opt(timestamp, 0);
         let timestamp = DateTime::<Local>::from_naive_utc_and_offset(dt.unwrap(), *Local::now().offset());
-        Some(LokiValue {
+        Some(Self {
             timestamp,
             log_line
         })
@@ -111,9 +111,9 @@ pub struct Loki {
 
 impl Loki {
     /// Create a new Loki client with a given address
-    pub fn new(address: String) -> Loki {
+    #[must_use] pub fn new(address: String) -> Self {
         let client = reqwest::Client::new();
-        Loki {
+        Self {
             address,
             client,
             buffer: Buffer::new()
@@ -132,7 +132,7 @@ impl Loki {
             .await;
 
         if let Err(e) = response {
-            println!("Error receiving label values: {}", e);
+            println!("Error receiving label values: {e}");
             return None;
         }
 
@@ -186,7 +186,7 @@ impl Loki {
                 results.push(LokiResult::from_json(labels, values_vec));
             }
         } else {
-            println!("Unknown result type: {}", result_type);
+            println!("Unknown result type: {result_type}");
         }
         Some(results)
     }
@@ -203,7 +203,7 @@ impl Loki {
             .await;
 
         if let Err(e) = response {
-            println!("Error receiving label values: {}", e);
+            println!("Error receiving label values: {e}");
             return None;
         }
 
@@ -216,7 +216,7 @@ impl Loki {
 
         let text = response.json::<LokiLabels>().await;
         if let Err(e) = text {
-            println!("Error parsing labels: {}", e);
+            println!("Error parsing labels: {e}");
             return None;
         }
 
@@ -235,7 +235,7 @@ impl Loki {
             .await;
 
         if let Err(e) = response {
-            println!("Error receiving labels: {}", e);
+            println!("Error receiving labels: {e}");
             return None;
         }
 
@@ -248,7 +248,7 @@ impl Loki {
 
         let text = response.json::<LokiLabels>().await;
         if let Err(e) = text {
-            println!("Error parsing labels: {}", e);
+            println!("Error parsing labels: {e}");
             return None;
         }
 
@@ -285,7 +285,7 @@ impl Loki {
             .await;
 
         if let Err(e) = response {
-            println!("Error sending data to Loki: {}", e);
+            println!("Error sending data to Loki: {e}");
         } else {
             let response = response.unwrap();
             if response.status() != 204 {

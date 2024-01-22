@@ -1,21 +1,26 @@
-use loki_ui::loki::Loki;
+use std::io::{stdout, self};
+
+use crossterm::{terminal::{enable_raw_mode, EnterAlternateScreen, disable_raw_mode, LeaveAlternateScreen}, ExecutableCommand};
+use loki_ui::ui::App;
+use ratatui::{Terminal, backend::CrosstermBackend};
+
 
 #[tokio::main]
-async fn main() {
+async fn main() -> io::Result<()> {
     color_eyre::install().unwrap();
-    let mut loki = Loki::new(String::from("http://localhost:3100"));
-    //loki.send_message(String::from("Was geht"), String::from("{job=\"a\"}"), None).await;
-    /*loki.send_message(String::from("Hello world test message"), String::from("{name=\"nils\", job=\"a\"}"), None).await;*/
+    enable_raw_mode()?;
+    stdout().execute(EnterAlternateScreen)?;
+    let mut terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
 
-    let results = loki.query_range("count_over_time({job=\"a\"} [1h])", None, None, None).await.unwrap();
-    //let results = loki.query_range("{job=\"a\"}", None, None, None).await.unwrap();
-    
-    for (counter, result) in results.into_iter().enumerate() {
-        println!("Result: {}", counter);
-        println!("Labels: {:?}", result.labels);
-        println!("Values:");
-        for value in result.values {
-            println!("  {:?}", value);
-        }
+    let mut app = App::new();
+
+    let mut should_quit = false;
+    while !should_quit {
+        terminal.draw(|f| app.render(f))?;
+        should_quit = app.handle_events()?;
     }
+
+    disable_raw_mode()?;
+    stdout().execute(LeaveAlternateScreen)?;
+    Ok(())
 }
