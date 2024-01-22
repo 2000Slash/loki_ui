@@ -8,6 +8,11 @@ use ratatui::{Terminal, backend::CrosstermBackend};
 #[tokio::main]
 async fn main() -> io::Result<()> {
     color_eyre::install().unwrap();
+    #[cfg(feature = "debug")]
+    {
+        tui_logger::init_logger(log::LevelFilter::Trace).unwrap();
+        tui_logger::set_default_level(log::LevelFilter::Trace);
+    }
     enable_raw_mode()?;
     stdout().execute(EnterAlternateScreen)?;
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout()))?;

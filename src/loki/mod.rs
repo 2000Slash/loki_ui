@@ -1,5 +1,5 @@
 
-use std::{ops::Add, collections::HashMap};
+use std::{collections::HashMap, ops::Add};
 
 use chrono::{DateTime, Local, Duration, NaiveDateTime};
 use loki_api::{logproto::{StreamAdapter, EntryAdapter, PushRequest}, prost_types::Timestamp, prost};
@@ -12,6 +12,7 @@ use types::LokiLabels;
 ///
 /// A buffer that can be used to encode and compress protobuf messages.
 /// This is then used by communications with Loki.
+#[derive(Clone)]
 struct Buffer {
     encoded: Vec<u8>,
     snappy: Vec<u8>,
@@ -103,6 +104,7 @@ impl LokiValue {
 
 ///
 /// A very basic Loki client
+#[derive(Clone)]
 pub struct Loki {
     address: String,
     client: reqwest::Client,

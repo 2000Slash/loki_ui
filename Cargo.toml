@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-# loki
+#loki
 reqwest = { version = "0.11.23", features = ["json"] }
 tokio = { version = "1.35.1", features = ["rt-multi-thread", "macros"] }
 loki-api = "0.1.1"
@@ -20,5 +20,13 @@ ratatui = "0.25.0"
 crossterm = "0.27.0"
 tui-textarea = "0.4.0"
 
+#debugging
+tui-logger = { version = "0.10.1", optional = true}
+log = "0.4.20"
+
 #general
 color-eyre = { version = "0.6.2", default-features = false }
+
+[features]
+debug = ["dep:tui-logger"]
+default = []
