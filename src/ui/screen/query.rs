@@ -1,13 +1,11 @@
-use std::sync::{Arc, Mutex};
+use std::{collections::HashMap, sync::{Arc, Mutex}};
 
 use crossterm::event::KeyEvent;
-use log::info;
-use ratatui::{layout::{Layout, Rect}, style::Style, text::Text, widgets::Paragraph, Frame};
+use log::{error, info};
+use ratatui::{layout::{Layout, Rect}, style::{Color, Style}, text::{Line, Span, Text}, widgets::Paragraph, Frame};
 
 #[cfg(feature = "debug")]
 use tui_logger::{TuiLoggerSmartWidget, TuiLoggerLevelOutput};
-#[cfg(feature = "debug")]
-use ratatui::style::Color;
 use tui_textarea::TextArea;
 
 use crate::{loki::Loki, ui::{App, Store}};
@@ -44,6 +42,23 @@ impl Query<'_> {
         }
     }
 
+    /// Draws the bottom Keyboard hints row
+    fn draw_keyhints(frame: &mut Frame, rect: Rect) {
+        let mut keymap: HashMap<char, String> = HashMap::new();
+        keymap.insert('Q', String::from("Quit"));
+
+        let mut text = Line::from("");
+        for (key, value) in keymap {
+            for char in value.chars() {
+                let mut style = Style::default().fg(Color::Gray);
+                if char == key {
+                    style = style.fg(Color::Red);
+                }
+                text.spans.push(Span::styled(String::from(char), style));
+            }
+        }
+        frame.render_widget(Paragraph::new(text), rect);
+    }
 
     fn query_bar(&self, frame: &mut Frame, rect: Rect) {
         let color = match self.selection {
@@ -104,6 +119,10 @@ impl Screen for Query<'_> {
     
         self.query_bar(frame, layout[0]);
         self.results_frame(frame, layout[1], app);
+
+        let height = frame.size().height;
+        let offset = 3;
+        Query::draw_keyhints(frame, Rect::new(offset, height - 1, frame.size().width - offset, 1));
 
         #[cfg(feature = "debug")]
         frame.render_widget(

@@ -1,12 +1,15 @@
 use serde::{Deserialize, Serialize};
 
+/// Contains all the code for interacting with loki
 pub mod loki;
+/// Contains all the code for the user interface
 pub mod ui;
 
 
+/// The configuration for the Loki client
 #[derive(Serialize, Deserialize)]
 pub struct LokiConfig {
-    url: String
+    pub url: String
 }
 
 impl Default for LokiConfig {

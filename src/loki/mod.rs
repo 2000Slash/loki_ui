@@ -108,6 +108,21 @@ impl LokiValue {
 
 ///
 /// A very basic Loki client
+/// # Example
+/// ```
+/// use tokio_test;
+/// # tokio_test::block_on(async {
+/// use loki_ui::loki::Loki;
+/// use log::error;
+/// 
+/// let mut loki = Loki::new(String::from("http://localhost:3100"));
+/// let result = loki.labels(None, None).await.unwrap();
+/// for label in result {
+///    println!("Label: {label}");
+/// }
+/// # })
+/// ```
+
 #[derive(Clone)]
 pub struct Loki {
     address: String,
@@ -126,6 +141,7 @@ impl Loki {
         }
     }
 
+    /// Runs a loki query and returns the results
     pub async fn query_range(&mut self, query: &str, limit: Option<i64>, start: Option<DateTime<Local>>, end: Option<DateTime<Local>>) -> Result<Vec<LokiResult>, Error> {
         let start = start.unwrap_or(Local::now().add(Duration::hours(-6)));
         let end = end.unwrap_or(Local::now());
@@ -260,7 +276,7 @@ impl Loki {
     }
 
     /// Send a message with labels to Loki
-    /// The labels should be in format: {job="test"}
+    /// The labels should be in format: `{job="test"}`
     pub async fn send_message(&mut self, line: String, labels: String, time: Option<DateTime<Local>>) {
         let time = time.unwrap_or(Local::now());
         let stream_adapter = StreamAdapter {
