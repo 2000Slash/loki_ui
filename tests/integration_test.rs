@@ -1,4 +1,5 @@
 use loki_ui::loki::Loki;
+use log::error;
 
 #[tokio::test]
 async fn main() {

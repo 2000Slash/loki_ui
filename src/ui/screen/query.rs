@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use crossterm::event::KeyEvent;
-use log::{error, info};
+use log::info;
 use ratatui::{layout::{Layout, Rect}, style::Style, text::Text, widgets::Paragraph, Frame};
 
 #[cfg(feature = "debug")]
