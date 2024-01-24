@@ -5,7 +5,9 @@ use log::error;
 async fn main() {
     color_eyre::install().unwrap();
     let mut loki = Loki::new(String::from("http://localhost:3100"));
-    //loki.send_message(String::from("Was geht"), String::from("{job=\"a\"}"), None).await;
+    loki.send_message(String::from("Test log"), String::from("{job=\"a\", instance=\"localhost\"}"), None).await;
+    loki.send_message(String::from("Another one"), String::from("{job=\"a\", instance=\"localhost\"}"), None).await;
+    loki.send_message(String::from("A different one"), String::from("{job=\"a\", instance=\"someotherhost\"}"), None).await;
     /*loki.send_message(String::from("Hello world test message"), String::from("{name=\"nils\", job=\"a\"}"), None).await;*/
 
     let results = loki.query_range("count_over_time({job=\"a\"} [1h])", None, None, None).await.unwrap();
