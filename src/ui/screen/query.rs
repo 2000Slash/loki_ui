@@ -1,7 +1,8 @@
-use std::{collections::HashMap, sync::{Arc, Mutex}};
+use std::{collections::HashMap, sync::{Arc, Mutex}, vec};
 
 use crossterm::event::KeyEvent;
-use log::{error, info};
+use log::info;
+
 use ratatui::{layout::{Layout, Rect}, style::{Color, Style}, text::{Line, Span, Text}, widgets::Paragraph, Frame};
 
 #[cfg(feature = "debug")]
@@ -10,11 +11,11 @@ use tui_textarea::TextArea;
 
 use crate::{loki::Loki, ui::{App, Store}};
 
-use super::Screen;
+use super::{settings::Settings, Screen};
 
 use ratatui::widgets::{Block, Borders};
 
-
+#[derive(PartialEq)]
 enum Selection {
     Query(bool),
     Results,
@@ -23,6 +24,7 @@ enum Selection {
 pub struct Query<'a> {
     query_textarea: TextArea<'a>,
     selection: Selection,
+    should_close: bool,
 }
 
 impl Default for Query<'_> {
@@ -39,20 +41,29 @@ impl Query<'_> {
         Self {
             query_textarea: textarea,
             selection: Selection::Query(false),
+            should_close: false,
         }
     }
 
     /// Draws the bottom Keyboard hints row
     fn draw_keyhints(frame: &mut Frame, rect: Rect) {
         let mut keymap: HashMap<char, String> = HashMap::new();
-        keymap.insert('Q', String::from("Quit"));
+        keymap.insert('q', String::from("quit "));
+        keymap.insert('s', String::from("settings"));
+        // quick hack to get the keys in the right order
+        let keys = vec!['q', 's'];
 
         let mut text = Line::from("");
-        for (key, value) in keymap {
+        for key in keys {
+            let value = keymap.get(&key).unwrap();
+            let mut found = false;
+            let mut style = Style::default().fg(Color::Gray);
             for char in value.chars() {
-                let mut style = Style::default().fg(Color::Gray);
-                if char == key {
+                if char == key && !found {
                     style = style.fg(Color::Red);
+                    found = true;
+                } else {
+                    style = style.fg(Color::Gray);
                 }
                 text.spans.push(Span::styled(String::from(char), style));
             }
@@ -95,6 +106,10 @@ impl Query<'_> {
 }
 
 impl Screen for Query<'_> {
+    fn should_close(&self) -> bool {
+        self.should_close
+    }
+
     fn render(&self, frame: &mut ratatui::prelude::Frame, app: &App) {
         let layout = Layout::default()
         .direction(ratatui::layout::Direction::Vertical)
@@ -142,13 +157,12 @@ impl Screen for Query<'_> {
         );
     }
 
-    fn handle_key_event(&mut self, key: KeyEvent, loki: &mut Loki, store: Arc<Mutex<Store>>) -> bool {
+    fn handle_key_event(&mut self, key: KeyEvent, loki: &mut Loki, store: Arc<Mutex<Store>>, screens: &mut Vec<Box<dyn Screen>>) {
         match self.selection {
             Selection::Query(true) => {
                 match key.code {
                     crossterm::event::KeyCode::Esc => {
                         self.selection = Selection::Query(false);
-                        return true;
                     }
                     crossterm::event::KeyCode::Enter => {
                         self.selection = Selection::Results;
@@ -174,46 +188,33 @@ impl Screen for Query<'_> {
                                 store.results = vec!["No results".to_string(), error.to_string()];
                             }
                         });
-                        return true;
                     }
                     _ => {
-                        return self.query_textarea.input(key);
+                        self.query_textarea.input(key);
                     }
                 }
             }
-            Selection::Query(false) => {
+            Selection::Query(false) | Selection::Results => {
                 match key.code {
                     crossterm::event::KeyCode::Up => {
                         self.selection = Selection::Query(false);
-                        return true;
                     }
                     crossterm::event::KeyCode::Down => {
                         self.selection = Selection::Results;
-                        return true;
                     }
-                    crossterm::event::KeyCode::Enter => {
-                        self.selection = Selection::Query(true);
-                        return true;
+                    crossterm::event::KeyCode::Char('s') => {
+                        screens.push(Box::from(Settings::default()));
                     }
-                    _ => { }
+                    crossterm::event::KeyCode::Char('q') | crossterm::event::KeyCode::Esc => {
+                        self.should_close = true;
+                    }
+                    _ => {
+                        if key.code == crossterm::event::KeyCode::Enter && self.selection == Selection::Query(false) {
+                            self.selection = Selection::Query(true);
+                        }
+                    }
                 }
             }
-            Selection::Results => {
-                match key.code {
-                    crossterm::event::KeyCode::Up => {
-                        self.selection = Selection::Query(false);
-                        return true;
-                    }
-                    crossterm::event::KeyCode::Down => {
-                        self.selection = Selection::Results;
-                        return true;
-                    }
-                    _ => { }
-                }
-            }
-        }
-
-        false
-        
+        }        
     }
 }

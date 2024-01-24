@@ -9,11 +9,11 @@ pub mod ui;
 /// The configuration for the Loki client
 #[derive(Serialize, Deserialize)]
 pub struct LokiConfig {
-    pub url: String
+    pub loki_url: String
 }
 
 impl Default for LokiConfig {
     fn default() -> Self {
-        Self { url: String::from("http://localhost:3100") }
+        Self { loki_url: String::from("http://localhost:3100") }
     }
 }

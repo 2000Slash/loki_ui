@@ -3,7 +3,6 @@ use log::error;
 
 #[tokio::test]
 async fn main() {
-    color_eyre::install().unwrap();
     let mut loki = Loki::new(String::from("http://localhost:3100"));
     loki.send_message(String::from("Test log"), String::from("{job=\"a\", instance=\"localhost\"}"), None).await;
     loki.send_message(String::from("Another one"), String::from("{job=\"a\", instance=\"localhost\"}"), None).await;

@@ -1,9 +1,10 @@
 use std::{io, sync::{Arc, Mutex}};
 
-use crossterm::event::{self, Event, KeyCode};
+use crossterm::event::{self, Event};
 use ratatui::Frame;
 
 use crate::{loki::Loki, LokiConfig};
+
 pub mod screen;
 
 
@@ -29,7 +30,7 @@ impl App {
     pub fn new(config: LokiConfig) -> Self {
         Self {
             screens: vec![Box::new(screen::Query::new())],
-            loki: Loki::new(config.url),
+            loki: Loki::new(config.loki_url),
             store: Arc::new(Mutex::new(Store::default()))
         }
     }
@@ -50,15 +51,15 @@ impl App {
                 let screen = self.screens.pop();
 
                 if let Some(mut screen) = screen {
-                    let captured = screen.handle_key_event(key, &mut self.loki, self.store.clone());
-                    self.screens.insert(index, screen);
-                    if captured {
-                        return Ok(false);
+                    screen.handle_key_event(key, &mut self.loki, self.store.clone(), &mut self.screens);
+                    
+                    if !screen.should_close() {
+                        self.screens.insert(index, screen);
                     }
-                }
 
-                if key.kind == event::KeyEventKind::Press && ( key.code == KeyCode::Char('q') || key.code == crossterm::event::KeyCode::Esc) {
-                    return Ok(true);
+                    if self.screens.is_empty() {
+                        return Ok(true);
+                    }
                 }
             }
         }

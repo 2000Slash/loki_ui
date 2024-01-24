@@ -6,10 +6,9 @@ use ratatui::{Terminal, backend::CrosstermBackend};
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
-    color_eyre::install().unwrap();
-
     #[cfg(feature = "debug")]
     {
+        color_eyre::install().unwrap();
         tui_logger::init_logger(log::LevelFilter::Trace).unwrap();
         tui_logger::set_default_level(log::LevelFilter::Trace);
     }
@@ -17,7 +16,11 @@ async fn main() -> io::Result<()> {
     enable_raw_mode()?;
     stdout().execute(EnterAlternateScreen)?;
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
-    let cfg: LokiConfig = confy::load("loki_ui", None).unwrap();
+    let envs = envy::from_env::<LokiConfig>();
+    let cfg = match envs {
+        Ok(envs) => envs,
+        Err(_) => confy::load("loki_ui", None).unwrap()
+    };
     let mut app = App::new(cfg);
 
     let mut should_quit = false;

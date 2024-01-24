@@ -1,6 +1,6 @@
 [package]
 name = "loki_ui"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 description = "A simple tui for grafana loki"
 license = "GPL-3.0"
@@ -10,7 +10,7 @@ keywords = ["loki", "grafana", "tui"]
 
 [dependencies]
 #loki
-reqwest = { version = "0.11.23", features = ["json"] }
+reqwest = { version = "0.11.23", default-features = false, features = ["json"] }
 tokio = { version = "1.35.1", features = ["rt-multi-thread", "macros"] }
 loki-api = "0.1.1"
 snap = "1.1.1"
@@ -24,18 +24,19 @@ crossterm = "0.27.0"
 tui-textarea = "0.4.0"
 
 #debugging
-tui-logger = { version = "0.10.1", optional = true}
+tui-logger = { version = "0.10.1", optional = true }
 log = "0.4.20"
+color-eyre = { version = "0.6.2", default-features = false, optional = true }
 
 #general
-color-eyre = { version = "0.6.2", default-features = false }
 confy = "0.6.0"
+envy = "0.4.2"
 
 [dev-dependencies]
 tokio-test = "0.4"
 
 [features]
-debug = ["dep:tui-logger"]
+debug = ["dep:tui-logger", "dep:color-eyre"]
 default = []
 
 [profile.release]
