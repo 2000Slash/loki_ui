@@ -1,8 +1,11 @@
-use std::io::{stdout, self};
+use std::io::{self, stdout};
 
-use crossterm::{terminal::{enable_raw_mode, EnterAlternateScreen, disable_raw_mode, LeaveAlternateScreen}, ExecutableCommand};
+use crossterm::{
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    ExecutableCommand,
+};
 use loki_ui::{ui::App, LokiConfig};
-use ratatui::{Terminal, backend::CrosstermBackend};
+use ratatui::{backend::CrosstermBackend, Terminal};
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
@@ -19,7 +22,7 @@ async fn main() -> io::Result<()> {
     let envs = envy::from_env::<LokiConfig>();
     let cfg = match envs {
         Ok(envs) => envs,
-        Err(_) => confy::load("loki_ui", None).unwrap()
+        Err(_) => confy::load("loki_ui", None).unwrap(),
     };
     let mut app = App::new(cfg);
 
@@ -31,5 +34,7 @@ async fn main() -> io::Result<()> {
 
     disable_raw_mode()?;
     stdout().execute(LeaveAlternateScreen)?;
+
+    confy::store("loki_ui", None, &app.config).unwrap();
     Ok(())
 }

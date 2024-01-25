@@ -1,15 +1,21 @@
-use std::{collections::HashMap, sync::{Arc, Mutex}, vec};
+use std::{collections::HashMap, vec};
 
 use crossterm::event::KeyEvent;
 use log::info;
 
-use ratatui::{layout::{Layout, Rect}, style::{Color, Style}, text::{Line, Span, Text}, widgets::Paragraph, Frame};
+use ratatui::{
+    layout::{Layout, Rect},
+    style::{Color, Style},
+    text::{Line, Span, Text},
+    widgets::Paragraph,
+    Frame,
+};
 
 #[cfg(feature = "debug")]
-use tui_logger::{TuiLoggerSmartWidget, TuiLoggerLevelOutput};
+use tui_logger::{TuiLoggerLevelOutput, TuiLoggerSmartWidget};
 use tui_textarea::TextArea;
 
-use crate::{loki::Loki, ui::{App, Store}};
+use crate::ui::App;
 
 use super::{settings::Settings, Screen};
 
@@ -78,7 +84,10 @@ impl Query<'_> {
             Selection::Results => ratatui::style::Color::White,
         };
 
-        let block = Block::default().borders(Borders::ALL).title("Query").border_style(Style::default().fg(color));
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .title("Query")
+            .border_style(Style::default().fg(color));
         let inner_area = block.inner(rect);
         frame.render_widget(block, rect);
         frame.render_widget(self.query_textarea.widget(), inner_area);
@@ -90,17 +99,16 @@ impl Query<'_> {
             _ => ratatui::style::Color::White,
         };
 
-        let block =             Block::default()
-        .title("Results")
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(color));
+        let block = Block::default()
+            .title("Results")
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(color));
 
         let store = app.store.lock().unwrap();
 
         frame.render_widget(
-                Paragraph::new(Text::from(store.results.join("\n")))
-                    .block(block),
-                rect,
+            Paragraph::new(Text::from(store.results.join("\n"))).block(block),
+            rect,
         );
     }
 }
@@ -112,68 +120,71 @@ impl Screen for Query<'_> {
 
     fn render(&self, frame: &mut ratatui::prelude::Frame, app: &App) {
         let layout = Layout::default()
-        .direction(ratatui::layout::Direction::Vertical)
-        .margin(1)
-        .constraints(
-            [
-                ratatui::layout::Constraint::Length(3),
-                ratatui::layout::Constraint::Percentage(50),
-                #[cfg(feature = "debug")]
-                ratatui::layout::Constraint::Percentage(50)
-            ]
-            .as_ref(),
-        )
-        .split(frame.size());
-    
+            .direction(ratatui::layout::Direction::Vertical)
+            .margin(1)
+            .constraints(
+                [
+                    ratatui::layout::Constraint::Length(3),
+                    ratatui::layout::Constraint::Percentage(50),
+                    #[cfg(feature = "debug")]
+                    ratatui::layout::Constraint::Percentage(50),
+                ]
+                .as_ref(),
+            )
+            .split(frame.size());
+
         frame.render_widget(
-            Block::default()
-                .title("Loki Ui")
-                .borders(Borders::ALL),
-                frame.size(),
+            Block::default().title("Loki Ui").borders(Borders::ALL),
+            frame.size(),
         );
-    
+
         self.query_bar(frame, layout[0]);
         self.results_frame(frame, layout[1], app);
 
         let height = frame.size().height;
         let offset = 3;
-        Query::draw_keyhints(frame, Rect::new(offset, height - 1, frame.size().width - offset, 1));
+        Query::draw_keyhints(
+            frame,
+            Rect::new(offset, height - 1, frame.size().width - offset, 1),
+        );
 
         #[cfg(feature = "debug")]
         frame.render_widget(
             TuiLoggerSmartWidget::default()
-                        .style_error(Style::default().fg(Color::Red))
-        .style_debug(Style::default().fg(Color::Green))
-        .style_warn(Style::default().fg(Color::Yellow))
-        .style_trace(Style::default().fg(Color::Magenta))
-        .style_info(Style::default().fg(Color::Cyan))
-        .output_separator(':')
-        .output_timestamp(Some("%H:%M:%S".to_string()))
-        .output_level(Some(TuiLoggerLevelOutput::Abbreviated))
-        .output_target(true)
-        .output_file(true)
-        .output_line(true),
-            layout[2]
+                .style_error(Style::default().fg(Color::Red))
+                .style_debug(Style::default().fg(Color::Green))
+                .style_warn(Style::default().fg(Color::Yellow))
+                .style_trace(Style::default().fg(Color::Magenta))
+                .style_info(Style::default().fg(Color::Cyan))
+                .output_separator(':')
+                .output_timestamp(Some("%H:%M:%S".to_string()))
+                .output_level(Some(TuiLoggerLevelOutput::Abbreviated))
+                .output_target(true)
+                .output_file(true)
+                .output_line(true),
+            layout[2],
         );
     }
 
-    fn handle_key_event(&mut self, key: KeyEvent, loki: &mut Loki, store: Arc<Mutex<Store>>, screens: &mut Vec<Box<dyn Screen>>) {
+    fn handle_key_event(&mut self, key: KeyEvent, app: &mut App) {
         match self.selection {
-            Selection::Query(true) => {
-                match key.code {
-                    crossterm::event::KeyCode::Esc => {
-                        self.selection = Selection::Query(false);
-                    }
-                    crossterm::event::KeyCode::Enter => {
-                        self.selection = Selection::Results;
-                        let text = self.query_textarea.lines()[0].to_string();
-                        let mut loki = loki.clone();
-                        tokio::spawn(async move {
-                            let result = loki.query_range(&text, None, None, None).await;
-                            info!("{:?}", result);
-                            let mut store = store.lock().unwrap();
-                            if let Ok(result) = result {
-                                let results_text: Vec<String> = result.iter().map(|result| {
+            Selection::Query(true) => match key.code {
+                crossterm::event::KeyCode::Esc => {
+                    self.selection = Selection::Query(false);
+                }
+                crossterm::event::KeyCode::Enter => {
+                    self.selection = Selection::Results;
+                    let text = self.query_textarea.lines()[0].to_string();
+                    let mut loki = app.loki.clone();
+                    let store = app.store.clone();
+                    tokio::spawn(async move {
+                        let result = loki.query_range(&text, None, None, None).await;
+                        info!("{:?}", result);
+                        let mut store = store.lock().unwrap();
+                        if let Ok(result) = result {
+                            let results_text: Vec<String> = result
+                                .iter()
+                                .map(|result| {
                                     let mut string = String::new();
                                     string.push_str(&format!("Labels: {:?}\n", result.labels));
                                     string.push_str("Values:\n");
@@ -181,40 +192,40 @@ impl Screen for Query<'_> {
                                         string.push_str(&format!("  {:?}\n", value));
                                     }
                                     string
-                                }).collect();
-                                store.results = results_text;
-                            } else {
-                                let error = result.unwrap_err();
-                                store.results = vec!["No results".to_string(), error.to_string()];
-                            }
-                        });
-                    }
-                    _ => {
-                        self.query_textarea.input(key);
-                    }
-                }
-            }
-            Selection::Query(false) | Selection::Results => {
-                match key.code {
-                    crossterm::event::KeyCode::Up => {
-                        self.selection = Selection::Query(false);
-                    }
-                    crossterm::event::KeyCode::Down => {
-                        self.selection = Selection::Results;
-                    }
-                    crossterm::event::KeyCode::Char('s') => {
-                        screens.push(Box::from(Settings::default()));
-                    }
-                    crossterm::event::KeyCode::Char('q') | crossterm::event::KeyCode::Esc => {
-                        self.should_close = true;
-                    }
-                    _ => {
-                        if key.code == crossterm::event::KeyCode::Enter && self.selection == Selection::Query(false) {
-                            self.selection = Selection::Query(true);
+                                })
+                                .collect();
+                            store.results = results_text;
+                        } else {
+                            let error = result.unwrap_err();
+                            store.results = vec!["No results".to_string(), error.to_string()];
                         }
+                    });
+                }
+                _ => {
+                    self.query_textarea.input(key);
+                }
+            },
+            Selection::Query(false) | Selection::Results => match key.code {
+                crossterm::event::KeyCode::Up => {
+                    self.selection = Selection::Query(false);
+                }
+                crossterm::event::KeyCode::Down => {
+                    self.selection = Selection::Results;
+                }
+                crossterm::event::KeyCode::Char('s') => {
+                    app.screens.push(Box::from(Settings::new(app.config.loki_url.clone())));
+                }
+                crossterm::event::KeyCode::Char('q') | crossterm::event::KeyCode::Esc => {
+                    self.should_close = true;
+                }
+                _ => {
+                    if key.code == crossterm::event::KeyCode::Enter
+                        && self.selection == Selection::Query(false)
+                    {
+                        self.selection = Selection::Query(true);
                     }
                 }
-            }
-        }        
+            },
+        }
     }
 }

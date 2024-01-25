@@ -1,4 +1,7 @@
-use std::{io, sync::{Arc, Mutex}};
+use std::{
+    io,
+    sync::{Arc, Mutex},
+};
 
 use crossterm::event::{self, Event};
 use ratatui::Frame;
@@ -7,31 +10,36 @@ use crate::{loki::Loki, LokiConfig};
 
 pub mod screen;
 
-
 pub struct Store {
-    pub results: Vec<String>
+    pub results: Vec<String>,
 }
 
 impl Default for Store {
     fn default() -> Self {
         Self {
-            results: vec![String::from("Type a query above and press enter to see the results"), String::from("You can switch between query and results with ⬆️  and ⬇️."), String::from("Press q or esc to quit")]
+            results: vec![
+                String::from("Type a query above and press enter to see the results"),
+                String::from("You can switch between query and results with ⬆️  and ⬇️."),
+                String::from("Press q or esc to quit"),
+            ],
         }
     }
 }
 
 pub struct App {
-    screens: Vec<Box<dyn screen::Screen>>,
-    loki: Loki,
-    store: Arc<Mutex<Store>>
+    pub screens: Vec<Box<dyn screen::Screen>>,
+    pub loki: Loki,
+    pub store: Arc<Mutex<Store>>,
+    pub config: LokiConfig,
 }
 
 impl App {
     pub fn new(config: LokiConfig) -> Self {
         Self {
             screens: vec![Box::new(screen::Query::new())],
-            loki: Loki::new(config.loki_url),
-            store: Arc::new(Mutex::new(Store::default()))
+            loki: Loki::new(config.loki_url.clone()),
+            store: Arc::new(Mutex::new(Store::default())),
+            config,
         }
     }
 
@@ -51,8 +59,8 @@ impl App {
                 let screen = self.screens.pop();
 
                 if let Some(mut screen) = screen {
-                    screen.handle_key_event(key, &mut self.loki, self.store.clone(), &mut self.screens);
-                    
+                    screen.handle_key_event(key, self);
+
                     if !screen.should_close() {
                         self.screens.insert(index, screen);
                     }
