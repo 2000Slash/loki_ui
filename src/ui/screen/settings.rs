@@ -86,6 +86,7 @@ impl Screen for Settings<'_> {
             Selection::None => match key.code {
                 crossterm::event::KeyCode::Esc | crossterm::event::KeyCode::Char('q') => {
                     app.config.loki_url = self.loki_url.lines()[0].to_string();
+                    app.loki.address = self.loki_url.lines()[0].to_string();
                     self.should_close = true;
                 }
                 crossterm::event::KeyCode::Enter => {

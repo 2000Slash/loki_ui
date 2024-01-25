@@ -130,7 +130,7 @@ impl LokiValue {
 
 #[derive(Clone)]
 pub struct Loki {
-    address: String,
+    pub address: String,
     client: reqwest::Client,
     buffer: Buffer,
 }

@@ -213,7 +213,8 @@ impl Screen for Query<'_> {
                     self.selection = Selection::Results;
                 }
                 crossterm::event::KeyCode::Char('s') => {
-                    app.screens.push(Box::from(Settings::new(app.config.loki_url.clone())));
+                    app.screens
+                        .push(Box::from(Settings::new(app.config.loki_url.clone())));
                 }
                 crossterm::event::KeyCode::Char('q') | crossterm::event::KeyCode::Esc => {
                     self.should_close = true;
