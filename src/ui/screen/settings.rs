@@ -37,7 +37,7 @@ impl Screen for Settings<'_> {
         self.should_close
     }
 
-    fn render(&self, frame: &mut ratatui::prelude::Frame, _app: &crate::ui::App) {
+    fn render(&mut self, frame: &mut ratatui::prelude::Frame, _app: &crate::ui::App) {
         let settings_window_block = Block::default().title("Settings").borders(Borders::ALL);
         let mut settings_window_size = Rect::default();
         settings_window_size.width = 60;

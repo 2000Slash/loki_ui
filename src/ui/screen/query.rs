@@ -6,7 +6,7 @@ use log::info;
 use ratatui::{
     layout::{Layout, Rect},
     style::{Color, Style},
-    text::{Line, Span, Text},
+    text::{Line, Span},
     widgets::Paragraph,
     Frame,
 };
@@ -24,11 +24,12 @@ use ratatui::widgets::{Block, Borders};
 #[derive(PartialEq)]
 enum Selection {
     Query(bool),
-    Results,
+    Results(bool),
 }
 
 pub struct Query<'a> {
     query_textarea: TextArea<'a>,
+    results_textarea: TextArea<'a>,
     selection: Selection,
     should_close: bool,
 }
@@ -41,11 +42,14 @@ impl Default for Query<'_> {
 
 impl Query<'_> {
     pub fn new() -> Self {
-        let mut textarea = TextArea::default();
-        textarea.set_cursor_line_style(Style::default());
-        textarea.set_placeholder_text("Enter a valid query");
+        let mut query_textarea = TextArea::default();
+        query_textarea.set_cursor_line_style(Style::default());
+        query_textarea.set_placeholder_text("Enter a valid query");
+        let mut results_textarea = TextArea::default();
+        results_textarea.set_cursor_line_style(Style::default());
         Self {
-            query_textarea: textarea,
+            results_textarea,
+            query_textarea,
             selection: Selection::Query(false),
             should_close: false,
         }
@@ -81,7 +85,7 @@ impl Query<'_> {
         let color = match self.selection {
             Selection::Query(true) => ratatui::style::Color::Yellow,
             Selection::Query(false) => ratatui::style::Color::Blue,
-            Selection::Results => ratatui::style::Color::White,
+            _ => ratatui::style::Color::White,
         };
 
         let block = Block::default()
@@ -93,9 +97,10 @@ impl Query<'_> {
         frame.render_widget(self.query_textarea.widget(), inner_area);
     }
 
-    fn results_frame(&self, frame: &mut Frame, rect: Rect, app: &App) {
+    fn results_frame(&mut self, frame: &mut Frame, rect: Rect, app: &App) {
         let color = match self.selection {
-            Selection::Results => ratatui::style::Color::Blue,
+            Selection::Results(false) => ratatui::style::Color::Blue,
+            Selection::Results(true) => ratatui::style::Color::Yellow,
             _ => ratatui::style::Color::White,
         };
 
@@ -104,12 +109,17 @@ impl Query<'_> {
             .borders(Borders::ALL)
             .border_style(Style::default().fg(color));
 
-        let store = app.store.lock().unwrap();
+        let mut store = app.store.lock().unwrap();
+        if store.results_changed {
+            self.results_textarea = TextArea::new(store.results.clone());
+            self.results_textarea
+                .set_cursor_line_style(Style::default());
+            store.results_changed = false;
+        }
 
-        frame.render_widget(
-            Paragraph::new(Text::from(store.results.join("\n"))).block(block),
-            rect,
-        );
+        let inner_size = block.inner(rect);
+        frame.render_widget(block, rect);
+        frame.render_widget(self.results_textarea.widget(), inner_size);
     }
 }
 
@@ -118,7 +128,7 @@ impl Screen for Query<'_> {
         self.should_close
     }
 
-    fn render(&self, frame: &mut ratatui::prelude::Frame, app: &App) {
+    fn render(&mut self, frame: &mut ratatui::prelude::Frame, app: &App) {
         let layout = Layout::default()
             .direction(ratatui::layout::Direction::Vertical)
             .margin(1)
@@ -173,7 +183,7 @@ impl Screen for Query<'_> {
                     self.selection = Selection::Query(false);
                 }
                 crossterm::event::KeyCode::Enter => {
-                    self.selection = Selection::Results;
+                    self.selection = Selection::Results(false);
                     let text = self.query_textarea.lines()[0].to_string();
                     let mut loki = app.loki.clone();
                     let store = app.store.clone();
@@ -186,31 +196,52 @@ impl Screen for Query<'_> {
                                 .iter()
                                 .map(|result| {
                                     let mut string = String::new();
-                                    string.push_str(&format!("Labels: {:?}\n", result.labels));
-                                    string.push_str("Values:\n");
+                                    string.push_str(&format!(
+                                        "Labels: \n{}\n",
+                                        serde_json::to_string_pretty(&result.labels).unwrap()
+                                    ));
+                                    string.push_str("\nValues:\n");
                                     for value in &result.values {
-                                        string.push_str(&format!("  {:?}\n", value));
+                                        string.push_str(&format!("  {}\n", value));
                                     }
+                                    string.push('\n');
                                     string
                                 })
                                 .collect();
-                            store.results = results_text;
+                            store.results = Vec::new();
+                            for result in results_text {
+                                for line in result.lines() {
+                                    store.results.push(line.to_string());
+                                }
+                            }
                         } else {
-                            let error = result.unwrap_err();
-                            store.results = vec!["No results".to_string(), error.to_string()];
+                            let error = result.unwrap_err().to_string();
+                            store.results = vec!["No results".to_string()];
+                            for line in error.lines() {
+                                store.results.push(line.to_string());
+                            }
                         }
+                        store.results_changed = true;
                     });
                 }
                 _ => {
                     self.query_textarea.input(key);
                 }
             },
-            Selection::Query(false) | Selection::Results => match key.code {
+            Selection::Results(true) => match key.code {
+                crossterm::event::KeyCode::Esc => {
+                    self.selection = Selection::Results(false);
+                }
+                _ => {
+                    self.results_textarea.input(key);
+                }
+            },
+            Selection::Query(false) | Selection::Results(false) => match key.code {
                 crossterm::event::KeyCode::Up => {
                     self.selection = Selection::Query(false);
                 }
                 crossterm::event::KeyCode::Down => {
-                    self.selection = Selection::Results;
+                    self.selection = Selection::Results(false);
                 }
                 crossterm::event::KeyCode::Char('s') => {
                     app.screens
@@ -220,10 +251,11 @@ impl Screen for Query<'_> {
                     self.should_close = true;
                 }
                 _ => {
-                    if key.code == crossterm::event::KeyCode::Enter
-                        && self.selection == Selection::Query(false)
-                    {
-                        self.selection = Selection::Query(true);
+                    if key.code == crossterm::event::KeyCode::Enter {
+                        self.selection = match self.selection {
+                            Selection::Query(_) => Selection::Query(true),
+                            Selection::Results(_) => Selection::Results(true),
+                        }
                     }
                 }
             },

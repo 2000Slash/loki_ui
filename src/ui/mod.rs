@@ -12,11 +12,13 @@ pub mod screen;
 
 pub struct Store {
     pub results: Vec<String>,
+    pub results_changed: bool,
 }
 
 impl Default for Store {
     fn default() -> Self {
         Self {
+            results_changed: true,
             results: vec![
                 String::from("Type a query above and press enter to see the results"),
                 String::from("You can switch between query and results with ⬆️  and ⬇️."),
@@ -43,9 +45,12 @@ impl App {
         }
     }
 
-    pub fn render(&self, frame: &mut Frame) {
-        for screen in &self.screens {
+    pub fn render(&mut self, frame: &mut Frame) {
+        let length = self.screens.len();
+        for i in 0..length {
+            let mut screen = self.screens.remove(i);
             screen.render(frame, self);
+            self.screens.insert(i, screen);
         }
     }
 

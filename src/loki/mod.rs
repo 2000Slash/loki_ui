@@ -1,4 +1,4 @@
-use std::{collections::HashMap, ops::Add};
+use std::{collections::HashMap, fmt::Display, ops::Add};
 
 use chrono::{DateTime, Duration, Local, NaiveDateTime};
 use log::error;
@@ -108,6 +108,12 @@ impl LokiValue {
             timestamp,
             log_line,
         })
+    }
+}
+
+impl Display for LokiValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[{}] {}", self.timestamp, self.log_line)
     }
 }
 
