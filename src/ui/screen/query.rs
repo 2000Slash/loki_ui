@@ -135,7 +135,7 @@ impl Screen for Query<'_> {
             .constraints(
                 [
                     ratatui::layout::Constraint::Length(3),
-                    ratatui::layout::Constraint::Percentage(50),
+                    ratatui::layout::Constraint::Percentage(100),
                     #[cfg(feature = "debug")]
                     ratatui::layout::Constraint::Percentage(50),
                 ]

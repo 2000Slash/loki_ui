@@ -1,6 +1,6 @@
 [package]
 name = "loki_ui"
-version = "0.1.5"
+version = "0.1.6"
 edition = "2021"
 description = "A simple tui for grafana loki"
 license = "GPL-3.0"
@@ -26,7 +26,7 @@ crossterm = "0.27.0"
 tui-textarea = "0.4.0"
 
 #debugging
-tui-logger = { version = "0.10.1", optional = true }
+tui-logger = { version = "0.11.0", optional = true }
 log = "0.4.20"
 color-eyre = { version = "0.6.2", default-features = false, optional = true }
 
