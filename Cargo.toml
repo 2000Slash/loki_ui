@@ -1,6 +1,6 @@
 [package]
 name = "loki_ui"
-version = "0.1.6"
+version = "0.1.7"
 edition = "2021"
 description = "A simple tui for grafana loki"
 license = "GPL-3.0"
@@ -16,12 +16,12 @@ reqwest = { version = "0.11.24", default-features = false, features = ["json"] }
 tokio = { version = "1.36.0", features = ["rt-multi-thread", "macros"] }
 loki-api = "0.1.1"
 snap = "1.1.1"
-chrono = "0.4.33"
-serde = { version = "1.0.195", features = ["derive"]}
+chrono = "0.4.34"
+serde = { version = "1.0.196", features = ["derive"]}
 serde_json = "1.0.113"
 
 #tui
-ratatui = "0.26.0"
+ratatui = "0.26.1"
 crossterm = "0.27.0"
 tui-textarea = "0.4.0"
 
