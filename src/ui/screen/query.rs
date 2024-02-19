@@ -17,7 +17,7 @@ use tui_textarea::TextArea;
 
 use crate::ui::App;
 
-use super::{settings::Settings, Screen};
+use super::{remove::Remove, settings::Settings, Screen};
 
 use ratatui::widgets::{Block, Borders};
 
@@ -58,10 +58,11 @@ impl Query<'_> {
     /// Draws the bottom Keyboard hints row
     fn draw_keyhints(frame: &mut Frame, rect: Rect) {
         let mut keymap: HashMap<char, String> = HashMap::new();
-        keymap.insert('q', String::from("quit "));
+        keymap.insert('q', String::from("quit"));
         keymap.insert('s', String::from("settings"));
+        keymap.insert('d', String::from("delete"));
         // quick hack to get the keys in the right order
-        let keys = vec!['q', 's'];
+        let keys = vec!['q', 's', 'd'];
 
         let mut text = Line::from("");
         for key in keys {
@@ -77,6 +78,7 @@ impl Query<'_> {
                 }
                 text.spans.push(Span::styled(String::from(char), style));
             }
+            text.spans.push(Span::raw(String::from("─")));
         }
         frame.render_widget(Paragraph::new(text), rect);
     }
@@ -249,6 +251,9 @@ impl Screen for Query<'_> {
                 }
                 crossterm::event::KeyCode::Char('q') | crossterm::event::KeyCode::Esc => {
                     self.should_close = true;
+                }
+                crossterm::event::KeyCode::Char('d') => {
+                    app.screens.push(Box::from(Remove::new(self.query_textarea.lines())));
                 }
                 _ => {
                     if key.code == crossterm::event::KeyCode::Enter {

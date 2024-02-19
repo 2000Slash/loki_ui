@@ -2,6 +2,7 @@ use crossterm::event::KeyEvent;
 use ratatui::Frame;
 
 mod query;
+mod remove;
 mod settings;
 
 pub use query::Query;
