@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Display, ops::Add};
+use std::{collections::HashMap, fmt::Display, io::Cursor, ops::Add};
 
 use chrono::{DateTime, Duration, Local, NaiveDateTime};
 use log::error;
@@ -135,7 +135,6 @@ impl Display for LokiValue {
 #[derive(Clone)]
 pub struct Loki {
     pub address: String,
-    client: reqwest::blocking::Client,
     buffer: Buffer,
 }
 
@@ -143,10 +142,8 @@ impl Loki {
     /// Create a new Loki client with a given address
     #[must_use]
     pub fn new(address: String) -> Self {
-        let client = reqwest::blocking::Client::new();
         Self {
             address,
-            client,
             buffer: Buffer::new(),
         }
     }
@@ -159,20 +156,18 @@ impl Loki {
         start: Option<DateTime<Local>>,
         end: Option<DateTime<Local>>,
     ) -> Result<Vec<LokiResult>, Error> {
-        let start = start.unwrap_or(Local::now().add(Duration::hours(-6)));
-        let end = end.unwrap_or(Local::now());
+        let start = start.unwrap_or(Local::now().add(Duration::hours(-6))).timestamp().to_string();
+        let end = end.unwrap_or(Local::now()).timestamp().to_string();
         let limit = limit.unwrap_or(100);
 
-        let response = self
-            .client
-            .get(format!("{}/loki/api/v1/query_range", self.address))
-            .query(&[
-                ("start", start.timestamp()),
-                ("end", end.timestamp()),
-                ("limit", limit),
+        let response = ureq::get(&format!("{}/loki/api/v1/query_range", self.address))
+            .query_pairs(vec![
+                ("start", start.as_str()),
+                ("end", end.as_str()),
+                ("limit", limit.to_string().as_str()),
             ])
-            .query(&[("query", query)])
-            .send();
+            .query("query", query)
+            .call();
 
         if let Err(e) = response {
             return Err(Error::with_source(
@@ -185,10 +180,10 @@ impl Loki {
         if response.status() != 200 {
             return Err(Error::new(format!(
                 "Error sending data to Loki: {:?}",
-                response.text()
+                response.into_string()
             )));
         }
-        let text = &response.text().unwrap();
+        let text = &response.into_string().unwrap();
         let text: Value = serde_json::from_str(text).unwrap();
 
         // There are two different types of results in loki
@@ -245,18 +240,16 @@ impl Loki {
         end: Option<DateTime<Local>>,
         query: Option<&str>,
     ) -> Option<Vec<String>> {
-        let start = start.unwrap_or(Local::now().add(Duration::hours(-6)));
-        let end = end.unwrap_or(Local::now());
+        let start = start.unwrap_or(Local::now().add(Duration::hours(-6))).timestamp().to_string();
+        let end = end.unwrap_or(Local::now()).timestamp().to_string();
 
-        let response = self
-            .client
-            .get(format!(
+        let response = ureq::get(&format!(
                 "{}/loki/api/v1/label/{}/values",
                 self.address, label
             ))
-            .query(&[("start", start.timestamp()), ("end", end.timestamp())])
-            .query(&[("query", query)])
-            .send();
+            .query_pairs(vec![("start", start.as_str()), ("end", end.as_str())])
+            .query("query", query.unwrap_or(""))
+            .call();
 
         if let Err(e) = response {
             error!("Error receiving label values: {e}");
@@ -266,11 +259,11 @@ impl Loki {
         let response = response.unwrap();
         if response.status() != 200 {
             error!("Error sending data to Loki: {}", response.status());
-            error!("Response: {:?}", response.text());
+            error!("Response: {:?}", response.into_string());
             return None;
         }
 
-        let text = response.json::<LokiLabels>();
+        let text = response.into_json::<LokiLabels>();
         if let Err(e) = text {
             error!("Error parsing labels: {e}");
             return None;
@@ -286,14 +279,12 @@ impl Loki {
         start: Option<DateTime<Local>>,
         end: Option<DateTime<Local>>,
     ) -> Option<Vec<String>> {
-        let start = start.unwrap_or(Local::now().add(Duration::hours(-6)));
-        let end = end.unwrap_or(Local::now());
+        let start = start.unwrap_or(Local::now().add(Duration::hours(-6))).timestamp().to_string();
+        let end = end.unwrap_or(Local::now()).timestamp().to_string();
 
-        let response = self
-            .client
-            .get(format!("{}/loki/api/v1/labels", self.address))
-            .query(&[("start", start.timestamp()), ("end", end.timestamp())])
-            .send();
+        let response = ureq::get(&format!("{}/loki/api/v1/labels", self.address))
+            .query_pairs(vec![("start", start.as_str()), ("end", &end.as_str())])
+            .call();
 
         if let Err(e) = response {
             error!("Error receiving labels: {e}");
@@ -303,11 +294,11 @@ impl Loki {
         let response = response.unwrap();
         if response.status() != 200 {
             error!("Error sending data to Loki: {}", response.status());
-            error!("Response: {:?}", response.text());
+            error!("Response: {:?}", response.into_string());
             return None;
         }
 
-        let text = response.json::<LokiLabels>();
+        let text = response.into_json::<LokiLabels>();
         if let Err(e) = text {
             error!("Error parsing labels: {e}");
             return None;
@@ -337,12 +328,9 @@ impl Loki {
 
     fn push(&mut self, streams: Vec<StreamAdapter>) {
         let body = &mut self.buffer.encode(&PushRequest { streams }).to_owned();
-        let response = self
-            .client
-            .post(format!("{}/loki/api/v1/push", self.address))
-            .body(body.clone())
-            .header(reqwest::header::CONTENT_TYPE, "application/x-snappy")
-            .send();
+        let response = ureq::post(&format!("{}/loki/api/v1/push", self.address))
+            .set("Content-Type", "application/x-snappy")
+            .send(Cursor::new(body));
 
         if let Err(e) = response {
             error!("Error sending data to Loki: {e}");
@@ -350,7 +338,7 @@ impl Loki {
             let response = response.unwrap();
             if response.status() != 204 {
                 error!("Error sending data to Loki: {}", response.status());
-                error!("Response: {:?}", response.text());
+                error!("Response: {:?}", response.into_string().unwrap());
             }
         }
     }

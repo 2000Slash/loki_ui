@@ -12,7 +12,7 @@ repository = "https://github.com/2000Slash/loki_ui"
 
 [dependencies]
 #loki
-reqwest = { version = "0.11.24", default-features = false, features = ["json", "blocking"] }
+ureq = { version = "2.9.6", default-features = false, features = ["json", "native-tls"]}
 loki-api = "0.1.1"
 snap = "1.1.1"
 chrono = "0.4.34"
