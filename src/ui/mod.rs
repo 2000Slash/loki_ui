@@ -67,9 +67,15 @@ impl App {
                 // We need to unset this, or these keys wont be recognized by tui-textarea
                 if cfg!(windows) {
                     match key.code {
-                        event::KeyCode::Char('\\') | event::KeyCode::Char('@') | event::KeyCode::Char('~') | event::KeyCode::Char('{') | event::KeyCode::Char('[') | event::KeyCode::Char(']') | event::KeyCode::Char('}')  => {
+                        event::KeyCode::Char('\\')
+                        | event::KeyCode::Char('@')
+                        | event::KeyCode::Char('~')
+                        | event::KeyCode::Char('{')
+                        | event::KeyCode::Char('[')
+                        | event::KeyCode::Char(']')
+                        | event::KeyCode::Char('}') => {
                             key.modifiers = event::KeyModifiers::empty();
-                        },
+                        }
                         _ => {}
                     }
                 }

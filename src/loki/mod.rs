@@ -121,23 +121,21 @@ impl Display for LokiValue {
 /// A very basic Loki client
 /// # Example
 /// ```
-/// use tokio_test;
-/// # tokio_test::block_on(async {
 /// use loki_ui::loki::Loki;
 /// use log::error;
 ///
 /// let mut loki = Loki::new(String::from("http://localhost:3100"));
-/// let result = loki.labels(None, None).await.unwrap();
+/// let result = loki.labels(None, None).unwrap();
+///
 /// for label in result {
-///    println!("Label: {label}");
+///     println!("Label: {label}");
 /// }
-/// # })
 /// ```
 
 #[derive(Clone)]
 pub struct Loki {
     pub address: String,
-    client: reqwest::Client,
+    client: reqwest::blocking::Client,
     buffer: Buffer,
 }
 
@@ -145,7 +143,7 @@ impl Loki {
     /// Create a new Loki client with a given address
     #[must_use]
     pub fn new(address: String) -> Self {
-        let client = reqwest::Client::new();
+        let client = reqwest::blocking::Client::new();
         Self {
             address,
             client,
@@ -154,7 +152,7 @@ impl Loki {
     }
 
     /// Runs a loki query and returns the results
-    pub async fn query_range(
+    pub fn query_range(
         &mut self,
         query: &str,
         limit: Option<i64>,
@@ -174,8 +172,7 @@ impl Loki {
                 ("limit", limit),
             ])
             .query(&[("query", query)])
-            .send()
-            .await;
+            .send();
 
         if let Err(e) = response {
             return Err(Error::with_source(
@@ -188,10 +185,10 @@ impl Loki {
         if response.status() != 200 {
             return Err(Error::new(format!(
                 "Error sending data to Loki: {:?}",
-                response.text().await
+                response.text()
             )));
         }
-        let text = &response.text().await.unwrap();
+        let text = &response.text().unwrap();
         let text: Value = serde_json::from_str(text).unwrap();
 
         // There are two different types of results in loki
@@ -241,7 +238,7 @@ impl Loki {
     }
 
     /// Retrieve the values for a given label from Loki
-    pub async fn label_values(
+    pub fn label_values(
         &mut self,
         label: &str,
         start: Option<DateTime<Local>>,
@@ -259,8 +256,7 @@ impl Loki {
             ))
             .query(&[("start", start.timestamp()), ("end", end.timestamp())])
             .query(&[("query", query)])
-            .send()
-            .await;
+            .send();
 
         if let Err(e) = response {
             error!("Error receiving label values: {e}");
@@ -270,11 +266,11 @@ impl Loki {
         let response = response.unwrap();
         if response.status() != 200 {
             error!("Error sending data to Loki: {}", response.status());
-            error!("Response: {:?}", response.text().await);
+            error!("Response: {:?}", response.text());
             return None;
         }
 
-        let text = response.json::<LokiLabels>().await;
+        let text = response.json::<LokiLabels>();
         if let Err(e) = text {
             error!("Error parsing labels: {e}");
             return None;
@@ -285,7 +281,7 @@ impl Loki {
     }
 
     /// Retrieve the labels from Loki
-    pub async fn labels(
+    pub fn labels(
         &mut self,
         start: Option<DateTime<Local>>,
         end: Option<DateTime<Local>>,
@@ -297,8 +293,7 @@ impl Loki {
             .client
             .get(format!("{}/loki/api/v1/labels", self.address))
             .query(&[("start", start.timestamp()), ("end", end.timestamp())])
-            .send()
-            .await;
+            .send();
 
         if let Err(e) = response {
             error!("Error receiving labels: {e}");
@@ -308,11 +303,11 @@ impl Loki {
         let response = response.unwrap();
         if response.status() != 200 {
             error!("Error sending data to Loki: {}", response.status());
-            error!("Response: {:?}", response.text().await);
+            error!("Response: {:?}", response.text());
             return None;
         }
 
-        let text = response.json::<LokiLabels>().await;
+        let text = response.json::<LokiLabels>();
         if let Err(e) = text {
             error!("Error parsing labels: {e}");
             return None;
@@ -324,12 +319,7 @@ impl Loki {
 
     /// Send a message with labels to Loki
     /// The labels should be in format: `{job="test"}`
-    pub async fn send_message(
-        &mut self,
-        line: String,
-        labels: String,
-        time: Option<DateTime<Local>>,
-    ) {
+    pub fn send_message(&mut self, line: String, labels: String, time: Option<DateTime<Local>>) {
         let time = time.unwrap_or(Local::now());
         let stream_adapter = StreamAdapter {
             labels,
@@ -342,18 +332,17 @@ impl Loki {
             }],
             hash: 0,
         };
-        self.push(vec![stream_adapter]).await;
+        self.push(vec![stream_adapter]);
     }
 
-    async fn push(&mut self, streams: Vec<StreamAdapter>) {
+    fn push(&mut self, streams: Vec<StreamAdapter>) {
         let body = &mut self.buffer.encode(&PushRequest { streams }).to_owned();
         let response = self
             .client
             .post(format!("{}/loki/api/v1/push", self.address))
             .body(body.clone())
             .header(reqwest::header::CONTENT_TYPE, "application/x-snappy")
-            .send()
-            .await;
+            .send();
 
         if let Err(e) = response {
             error!("Error sending data to Loki: {e}");
@@ -361,7 +350,7 @@ impl Loki {
             let response = response.unwrap();
             if response.status() != 204 {
                 error!("Error sending data to Loki: {}", response.status());
-                error!("Response: {:?}", response.text().await);
+                error!("Response: {:?}", response.text());
             }
         }
     }

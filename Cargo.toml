@@ -12,8 +12,7 @@ repository = "https://github.com/2000Slash/loki_ui"
 
 [dependencies]
 #loki
-reqwest = { version = "0.11.24", default-features = false, features = ["json"] }
-tokio = { version = "1.36.0", features = ["rt-multi-thread", "macros"] }
+reqwest = { version = "0.11.24", default-features = false, features = ["json", "blocking"] }
 loki-api = "0.1.1"
 snap = "1.1.1"
 chrono = "0.4.34"
@@ -33,9 +32,6 @@ color-eyre = { version = "0.6.2", default-features = false, optional = true }
 #general
 confy = "0.6.0"
 envy = "0.4.2"
-
-[dev-dependencies]
-tokio-test = "0.4"
 
 [features]
 debug = ["dep:tui-logger", "dep:color-eyre"]

@@ -7,8 +7,7 @@ use crossterm::{
 use loki_ui::{ui::App, LokiConfig};
 use ratatui::{backend::CrosstermBackend, Terminal};
 
-#[tokio::main]
-async fn main() -> io::Result<()> {
+fn main() -> io::Result<()> {
     #[cfg(feature = "debug")]
     {
         color_eyre::install().unwrap();

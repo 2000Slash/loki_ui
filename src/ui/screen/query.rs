@@ -1,4 +1,4 @@
-use std::{collections::HashMap, vec};
+use std::{collections::HashMap, thread, vec};
 
 use crossterm::event::KeyEvent;
 use log::info;
@@ -187,8 +187,8 @@ impl Screen for Query<'_> {
                     let text = self.query_textarea.lines()[0].to_string();
                     let mut loki = app.loki.clone();
                     let store = app.store.clone();
-                    tokio::spawn(async move {
-                        let result = loki.query_range(&text, None, None, None).await;
+                    thread::spawn(move || {
+                        let result = loki.query_range(&text, None, None, None);
                         info!("{:?}", result);
                         let mut store = store.lock().unwrap();
                         if let Ok(result) = result {
