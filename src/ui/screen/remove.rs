@@ -1,5 +1,3 @@
-use std::thread;
-
 use ratatui::layout::{Alignment, Layout, Rect};
 use ratatui::prelude::Style;
 use ratatui::widgets::{Block, BorderType, Borders, Clear, Paragraph};
@@ -23,12 +21,6 @@ pub struct Remove<'a> {
     should_close: bool,
     query_textarea: TextArea<'a>,
     selection: Selection,
-}
-
-impl Default for Remove<'_> {
-    fn default() -> Self {
-        Remove::new(&[])
-    }
 }
 
 impl Remove<'_> {
@@ -112,7 +104,7 @@ impl Remove<'_> {
         Remove {
             should_close: false,
             query_textarea,
-            selection: Selection::Query(false),
+            selection: Selection::Buttons(Buttons::Right),
         }
     }
 }
@@ -127,7 +119,7 @@ impl Screen for Remove<'_> {
             self.should_close = true;
             return;
         }
-        
+
         let layout = Layout::default()
             .direction(ratatui::layout::Direction::Vertical)
             .margin(1)
@@ -177,6 +169,11 @@ impl Screen for Remove<'_> {
                         self.selection = Selection::Buttons(Buttons::Left);
                     }
                 }
+                crossterm::event::KeyCode::Right => {
+                    if let Selection::Buttons(_) = self.selection {
+                        self.selection = Selection::Buttons(Buttons::Right);
+                    }
+                }
                 crossterm::event::KeyCode::Enter => match self.selection {
                     Selection::Query(false) => {
                         self.selection = Selection::Query(true);
@@ -210,11 +207,6 @@ impl Screen for Remove<'_> {
                     }
                     _ => (),
                 },
-                crossterm::event::KeyCode::Right => {
-                    if let Selection::Buttons(_) = self.selection {
-                        self.selection = Selection::Buttons(Buttons::Right);
-                    }
-                }
                 _ => {}
             },
         }

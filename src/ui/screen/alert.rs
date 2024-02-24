@@ -20,11 +20,15 @@ pub struct Alert {
     selection: Selection,
     text: &'static str,
     title: &'static str,
-    action: Option<Box<dyn FnMut() -> ()>>,
+    action: Option<Box<dyn FnMut()>>,
 }
 
 impl Alert {
-    pub fn with_action(title: &'static str, text: &'static str, action: impl Fn() -> () + 'static) -> Self {
+    pub fn with_action(
+        title: &'static str,
+        text: &'static str,
+        action: impl Fn() + 'static,
+    ) -> Self {
         Alert {
             title,
             text,
@@ -152,6 +156,9 @@ impl Screen for Alert {
             }
             KeyCode::Left => {
                 self.selection = Selection::Ok;
+            }
+            KeyCode::Esc | KeyCode::Char('q') => {
+                self.should_close = true;
             }
             _ => {}
         }
