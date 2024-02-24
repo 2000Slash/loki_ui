@@ -15,26 +15,20 @@ enum Selection {
     Ok,
 }
 
-pub struct Alert<F>
-where
-    F: FnMut(),
-{
+pub struct Alert {
     should_close: bool,
     selection: Selection,
     text: &'static str,
     title: &'static str,
-    action: Option<F>,
+    action: Option<Box<dyn FnMut() -> ()>>,
 }
 
-impl<F> Alert<F>
-where
-    F: FnMut(),
-{
-    pub fn with_action(title: &'static str, text: &'static str, action: F) -> Self {
+impl Alert {
+    pub fn with_action(title: &'static str, text: &'static str, action: impl Fn() -> () + 'static) -> Self {
         Alert {
             title,
             text,
-            action: Some(action),
+            action: Some(Box::from(action)),
             should_close: false,
             selection: Selection::Cancel,
         }
@@ -108,10 +102,7 @@ where
     }
 }
 
-impl<F> Screen for Alert<F>
-where
-    F: FnMut(),
-{
+impl Screen for Alert {
     fn should_close(&self) -> bool {
         self.should_close
     }

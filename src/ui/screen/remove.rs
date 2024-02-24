@@ -122,7 +122,12 @@ impl Screen for Remove<'_> {
         self.should_close
     }
 
-    fn render(&mut self, frame: &mut ratatui::prelude::Frame, _app: &crate::ui::App) {
+    fn render(&mut self, frame: &mut ratatui::prelude::Frame, app: &crate::ui::App) {
+        if app.store.lock().unwrap().results_changed {
+            self.should_close = true;
+            return;
+        }
+        
         let layout = Layout::default()
             .direction(ratatui::layout::Direction::Vertical)
             .margin(1)
@@ -182,15 +187,26 @@ impl Screen for Remove<'_> {
                     Selection::Buttons(Buttons::Left) => {
                         let loki = app.loki.clone();
                         let query = self.query_textarea.lines()[0].to_string();
-                        app.screens
-                            .push(Box::from(Alert::with_action("Remove data for query?", "This will create a delete request for all Data\nfound with this Query. Once the delete request\nis executed, you cant undo this!", move || {
-                                let loki = loki.clone();
-                                let query = query.clone();
-                                thread::spawn(move || {
-                                    let mut loki = loki.clone();
-                                    loki.delete(&query, None, None).unwrap();
-                                });
-                            })));
+                        let store = app.store.clone();
+                        app.screens.push(Box::from(Alert::with_action(
+                            "Remove data for query?",
+                            "This will create a delete request for all Data\nfound with this Query. Once the delete request\nis executed, you cant undo this!",
+                            move || {
+                                let mut loki = loki.clone();
+                                let result = loki.delete(&query, None, None);
+                                let mut store = store.lock().unwrap();
+                                if result.is_err() {
+                                    let error = result.unwrap_err().to_string();
+                                    store.results = Vec::new();
+                                    for line in error.lines() {
+                                        store.results.push(line.to_string());
+                                    }
+                                } else {
+                                    store.results = vec!["Deletion request sent!".to_string()];
+                                }
+                                store.results_changed = true;
+                            },
+                        )));
                     }
                     _ => (),
                 },

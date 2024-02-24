@@ -50,7 +50,14 @@ impl App {
         for i in 0..length {
             let mut screen = self.screens.remove(i);
             screen.render(frame, self);
-            self.screens.insert(i, screen);
+            if !screen.should_close() {
+                self.screens.insert(i, screen);
+            }
+        }
+
+        let mut store = self.store.lock().unwrap();
+        if store.results_changed {
+            store.results_changed = false;
         }
     }
 

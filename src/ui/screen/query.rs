@@ -111,12 +111,11 @@ impl Query<'_> {
             .borders(Borders::ALL)
             .border_style(Style::default().fg(color));
 
-        let mut store = app.store.lock().unwrap();
+        let store = app.store.lock().unwrap();
         if store.results_changed {
             self.results_textarea = TextArea::new(store.results.clone());
             self.results_textarea
                 .set_cursor_line_style(Style::default());
-            store.results_changed = false;
         }
 
         let inner_size = block.inner(rect);
