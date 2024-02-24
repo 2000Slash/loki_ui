@@ -253,7 +253,8 @@ impl Screen for Query<'_> {
                     self.should_close = true;
                 }
                 crossterm::event::KeyCode::Char('d') => {
-                    app.screens.push(Box::from(Remove::new(self.query_textarea.lines())));
+                    app.screens
+                        .push(Box::from(Remove::new(self.query_textarea.lines())));
                 }
                 _ => {
                     if key.code == crossterm::event::KeyCode::Enter {

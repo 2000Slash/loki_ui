@@ -16,8 +16,8 @@ ureq = { version = "2.9.6", default-features = false, features = ["json", "nativ
 loki-api = "0.1.1"
 snap = "1.1.1"
 chrono = "0.4.34"
-serde = { version = "1.0.196", features = ["derive"]}
-serde_json = "1.0.113"
+serde = { version = "1.0.197", features = ["derive"]}
+serde_json = "1.0.114"
 
 #tui
 ratatui = "0.26.1"

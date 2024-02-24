@@ -1,6 +1,7 @@
 use crossterm::event::KeyEvent;
 use ratatui::Frame;
 
+mod alert;
 mod query;
 mod remove;
 mod settings;
