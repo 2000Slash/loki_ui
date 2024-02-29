@@ -46,11 +46,22 @@ impl App {
     }
 
     pub fn render(&mut self, frame: &mut Frame) {
-        let length = self.screens.len();
-        for i in 0..length {
+        let mut length = self.screens.len();
+        let mut i = 0;
+        while i < length {
             let mut screen = self.screens.remove(i);
             screen.render(frame, self);
-            self.screens.insert(i, screen);
+            if !screen.should_close() {
+                self.screens.insert(i, screen);
+            } else {
+                length -= 1;
+            }
+            i += 1;
+        }
+
+        let mut store = self.store.lock().unwrap();
+        if store.results_changed {
+            store.results_changed = false;
         }
     }
 
@@ -73,7 +84,8 @@ impl App {
                         | event::KeyCode::Char('{')
                         | event::KeyCode::Char('[')
                         | event::KeyCode::Char(']')
-                        | event::KeyCode::Char('}') => {
+                        | event::KeyCode::Char('}')
+                        | event::KeyCode::Char('|') => {
                             key.modifiers = event::KeyModifiers::empty();
                         }
                         _ => {}

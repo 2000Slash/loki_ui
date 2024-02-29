@@ -1,9 +1,12 @@
 use crossterm::event::KeyEvent;
 use ratatui::Frame;
 
+mod alert;
 mod query;
+mod remove;
 mod settings;
 
+pub use alert::Alert;
 pub use query::Query;
 
 use super::App;

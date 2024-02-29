@@ -156,7 +156,10 @@ impl Loki {
         start: Option<DateTime<Local>>,
         end: Option<DateTime<Local>>,
     ) -> Result<Vec<LokiResult>, Error> {
-        let start = start.unwrap_or(Local::now().add(Duration::hours(-6))).timestamp().to_string();
+        let start = start
+            .unwrap_or(Local::now().add(Duration::hours(-6)))
+            .timestamp()
+            .to_string();
         let end = end.unwrap_or(Local::now()).timestamp().to_string();
         let limit = limit.unwrap_or(100);
 
@@ -240,16 +243,19 @@ impl Loki {
         end: Option<DateTime<Local>>,
         query: Option<&str>,
     ) -> Option<Vec<String>> {
-        let start = start.unwrap_or(Local::now().add(Duration::hours(-6))).timestamp().to_string();
+        let start = start
+            .unwrap_or(Local::now().add(Duration::hours(-6)))
+            .timestamp()
+            .to_string();
         let end = end.unwrap_or(Local::now()).timestamp().to_string();
 
         let response = ureq::get(&format!(
-                "{}/loki/api/v1/label/{}/values",
-                self.address, label
-            ))
-            .query_pairs(vec![("start", start.as_str()), ("end", end.as_str())])
-            .query("query", query.unwrap_or(""))
-            .call();
+            "{}/loki/api/v1/label/{}/values",
+            self.address, label
+        ))
+        .query_pairs(vec![("start", start.as_str()), ("end", end.as_str())])
+        .query("query", query.unwrap_or(""))
+        .call();
 
         if let Err(e) = response {
             error!("Error receiving label values: {e}");
@@ -279,11 +285,14 @@ impl Loki {
         start: Option<DateTime<Local>>,
         end: Option<DateTime<Local>>,
     ) -> Option<Vec<String>> {
-        let start = start.unwrap_or(Local::now().add(Duration::hours(-6))).timestamp().to_string();
+        let start = start
+            .unwrap_or(Local::now().add(Duration::hours(-6)))
+            .timestamp()
+            .to_string();
         let end = end.unwrap_or(Local::now()).timestamp().to_string();
 
         let response = ureq::get(&format!("{}/loki/api/v1/labels", self.address))
-            .query_pairs(vec![("start", start.as_str()), ("end", &end.as_str())])
+            .query_pairs(vec![("start", start.as_str()), ("end", (end.as_str()))])
             .call();
 
         if let Err(e) = response {
@@ -324,6 +333,40 @@ impl Loki {
             hash: 0,
         };
         self.push(vec![stream_adapter]);
+    }
+
+    /// Creates a delete request in Loki https://grafana.com/docs/grafana-cloud/send-data/logs/delete-log-lines/
+    pub fn delete(
+        &mut self,
+        query: &str,
+        start: Option<DateTime<Local>>,
+        end: Option<DateTime<Local>>,
+    ) -> Result<(), Error> {
+        let start = start
+            .unwrap_or(Local::now().add(Duration::hours(-6)))
+            .timestamp()
+            .to_string();
+        let end = end.unwrap_or(Local::now()).timestamp().to_string();
+        let response = ureq::post(&format!("{}/loki/api/v1/delete", self.address))
+            .query_pairs(vec![("start", start.as_str()), ("end", end.as_str())])
+            .query("query", query)
+            .call();
+
+        if let Err(e) = response {
+            return Err(Error::with_source(
+                Box::new(e),
+                String::from("Error sending delete request"),
+            ));
+        }
+
+        let response = response.unwrap();
+        if response.status() != 204 {
+            return Err(Error::new(format!(
+                "Delete request was not processed correctly: {:?}",
+                response
+            )));
+        }
+        Ok(())
     }
 
     fn push(&mut self, streams: Vec<StreamAdapter>) {
